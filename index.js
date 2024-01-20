@@ -24,17 +24,18 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // Serve the React app
-app.use(express.static(path.join(__dirname, 'file-upload-app/build')));
+app.use(express.static(path.join(__dirname, 'speech_therapy/build')));
 
 // Handle file upload endpoint
 app.post('/upload', upload.single('file'), (req, res) => {
+  console.log(req)
   console.log('File uploaded:', req.file);
   res.status(200).send('File uploaded successfully!');
 });
 
 // Catch-all route to serve the React app
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'file-upload-app/build/index.html'));
+  res.sendFile(path.join(__dirname, 'speech_therapy/build/index.html'));
 });
 
 app.listen(port, () => {
