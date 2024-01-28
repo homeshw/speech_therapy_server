@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const cors = require('cors'); 
+const cors = require('cors');
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 const ffmpeg = require('fluent-ffmpeg');
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -14,12 +14,11 @@ const port = 5001;
 
 // Use the cors middleware to enable CORS
 app.use(cors({
-    origin: 'http://localhost:3000',
+  origin: 'http://localhost:3000',
 }));
 
 const upload_loc = '../speech_therapy_shared_files/audio_files/'
-
-const wordArray = [{src:'word1.mp3',word:'word1'}, {src:'word2.mp3',word:'word2'}, {src:'word3.mp3',word:'word3'}];
+const confFilePath = 'config.json'
 
 const bodyParser = require('body-parser');
 app.use(bodyParser.json());
@@ -57,28 +56,37 @@ function convertWavToMp3(inputPath, outputPath) {
   });
 }
 
-const getAudioFromDatabase = async (file_name)  => {  
-  try {
-    const data = await fs.readFile(upload_loc + file_name, { encoding: 'utf8' });
-    return data;
-  } catch (err) {
-    console.log(err)
-    return err;
-  }
-}
+const updateConfig = (newObj) => {
+  fs.readFile(confFilePath, 'utf8', (err, data) => {
+    if (err) {
+      fs.writeFile(confFilePath, JSON.stringify([newObj]), 'utf8', (writeErr) => {
+        if (writeErr) {
+          console.error(`Error writing file: ${writeErr}`);
+        } else {
+          console.log('File created with new data');
+        }
+      });
+    } else {
+      const existingData = JSON.parse(data);
 
-const getRandomIndex = (array) => {
-  const randomIndex = Math.floor(Math.random() * array.length);
-  return randomIndex;
+      existingData.push(newObj);
+
+      fs.writeFile(confFilePath, JSON.stringify(existingData), 'utf8', (writeErr) => {
+        if (writeErr) {
+          console.error(`Error writing file: ${writeErr}`);
+        } else {
+          console.log('Data appended to file')
+        }
+
+      });
+    }
+  })
 };
-
-// Get a random index from the array
-const randomIndex = getRandomIndex(wordArray);
 
 app.get('/get/audio/:src', async (req, res, next) => {
 
   file_name = req.params.src;
-  
+
   const filePath = upload_loc + file_name;
 
   const stat = fs.statSync(filePath);
@@ -94,49 +102,64 @@ app.get('/get/audio/:src', async (req, res, next) => {
 
 })
 
-app.get('/get/testarray', (req, res) => {
+app.get('/get/testarray', async (req, res) => {
 
-  res.header('Content-Type','application/json');
-  res.send( wordArray );
+  res.header('Content-Type', 'application/json');
+  fs.readFile(confFilePath, 'utf8', (err, data) => {
+    if (err) {
+      console.error(`Error reading file: ${err}`);
+      res.status(500).json({ error: 'Internal Server Error' });
+    } else {
+      try {
+        const jsonData = JSON.parse(data);
+        res.json(jsonData);
+      } catch (parseError) {
+        console.error(`Error parsing JSON: ${parseError}`);
+        res.status(500).json({ error: 'Error parsing JSON' });
+      }
+    }
+  })
+  
 })
 
 // Handle file upload endpoint
 app.post('/upload', upload.single('file'), (req, res) => {
+
   //console.log(req)
   fileName = req.file.originalname
-  
+
   fileNameWOext = path.parse(fileName).name;
 
   console.log('.wav file uploaded: ' + fileNameWOext + '.wav');
 
   inputPath = upload_loc + fileNameWOext + '.wav';
-  outputPath = upload_loc + fileNameWOext + '.mp3';  
+  outputPath = upload_loc + fileNameWOext + '.mp3';
 
   convertWavToMp3(inputPath, outputPath)
-  .then(() => {
-    console.log('Conversion successful');
-    fs.unlink(inputPath, (err) => {
-      if (err) {
-        console.error(`Error deleting file: ${err}`);
-      } else {
-        console.log(`.wav file deleted successfully: ${fileNameWOext}.wav`);
-      }
+    .then(() => {
+      console.log('Conversion successful');
+      fs.unlink(inputPath, (err) => {
+        if (err) {
+          console.error(`Error deleting file: ${err}`);
+        } else {
+          console.log(`.wav file deleted successfully: ${fileNameWOext}.wav`);
+        }
+      });
+      updateConfig({ src: `${fileNameWOext}.mp3`, word: fileNameWOext });
+    })
+    .catch((error) => {
+      console.error('Conversion failed:', error);
     });
-  })
-  .catch((error) => {
-    console.error('Conversion failed:', error);
-  });
   console.log('.mp3 file uploaded: ' + fileNameWOext + '.mp3');
-  
+
   res.status(200).send('File upload success');
+  
 });
 
 // Catch-all route to serve the React app
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'speech_therapy/build/index.html'));
 });
-
-
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
