@@ -1,1 +1,3 @@
 node_modules
+audio_files/*.mp3
+config.json

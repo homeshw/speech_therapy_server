@@ -17,7 +17,7 @@ app.use(cors({
   origin: 'http://localhost:3000',
 }));
 
-const upload_loc = '../speech_therapy_shared_files/audio_files/'
+const upload_loc = './audio_files/'
 const confFilePath = 'config.json'
 
 const bodyParser = require('body-parser');
@@ -127,6 +127,9 @@ app.post('/upload', upload.single('file'), (req, res) => {
 
   //console.log(req)
   fileName = req.file.originalname
+  word =  req.body.word
+
+  console.log(word);
 
   fileNameWOext = path.parse(fileName).name;
 
@@ -145,7 +148,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
           console.log(`.wav file deleted successfully: ${fileNameWOext}.wav`);
         }
       });
-      updateConfig({ src: `${fileNameWOext}.mp3`, word: fileNameWOext });
+      updateConfig({ src: `${fileNameWOext}.mp3`, word:  word});
     })
     .catch((error) => {
       console.error('Conversion failed:', error);
