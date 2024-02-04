@@ -6,16 +6,25 @@ const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 const ffmpeg = require('fluent-ffmpeg');
 ffmpeg.setFfmpegPath(ffmpegPath);
 
+require('dotenv').config();
+
 //const fs = require('node:fs/promises');
 const fs = require('fs');
 
 const app = express();
-const port = 5001;
+const appConfig = {
+  port: process.env.APP_PORT
+};
+
+const port = appConfig.port;
 
 // Use the cors middleware to enable CORS
-app.use(cors({
-  origin: 'http://localhost:3000',
-}));
+// app.use(cors({
+//   origin: 'http://localhost:3000',
+// }));
+
+// Enable CORS for all routes
+app.use(cors());
 
 const upload_loc = './audio_files/'
 const confFilePath = 'config.json'
@@ -119,44 +128,51 @@ app.get('/get/testarray', async (req, res) => {
       }
     }
   })
-  
+
 })
 
 // Handle file upload endpoint
 app.post('/upload', upload.single('file'), (req, res) => {
 
-  //console.log(req)
-  fileName = req.file.originalname
-  word =  req.body.word
+  try {
 
-  console.log(word);
+    //console.log(req)
+    fileName = req.file.originalname
+    word = req.body.word
 
-  fileNameWOext = path.parse(fileName).name;
+    console.log(word);
 
-  console.log('.wav file uploaded: ' + fileNameWOext + '.wav');
+    fileNameWOext = path.parse(fileName).name;
 
-  inputPath = upload_loc + fileNameWOext + '.wav';
-  outputPath = upload_loc + fileNameWOext + '.mp3';
+    console.log('.wav file uploaded: ' + fileNameWOext + '.wav');
 
-  convertWavToMp3(inputPath, outputPath)
-    .then(() => {
-      console.log('Conversion successful');
-      fs.unlink(inputPath, (err) => {
-        if (err) {
-          console.error(`Error deleting file: ${err}`);
-        } else {
-          console.log(`.wav file deleted successfully: ${fileNameWOext}.wav`);
-        }
+    inputPath = upload_loc + fileNameWOext + '.wav';
+    outputPath = upload_loc + fileNameWOext + '.mp3';
+
+    convertWavToMp3(inputPath, outputPath)
+      .then(() => {
+        console.log('Conversion successful');
+        fs.unlink(inputPath, (err) => {
+          if (err) {
+            console.error(`Error deleting file: ${err}`);
+          } else {
+            console.log(`.wav file deleted successfully: ${fileNameWOext}.wav`);
+          }
+        });
+        updateConfig({ src: `${fileNameWOext}.mp3`, word: word });
+
+        console.log('.mp3 file uploaded: ' + fileNameWOext + '.mp3');
+        res.status(200).send('File upload success');
+      })
+      .catch((error) => {
+        console.error('Conversion failed:', error);
+        res.status(500).send('File upload unsuccess');
       });
-      updateConfig({ src: `${fileNameWOext}.mp3`, word:  word});
-    })
-    .catch((error) => {
-      console.error('Conversion failed:', error);
-    });
-  console.log('.mp3 file uploaded: ' + fileNameWOext + '.mp3');
 
-  res.status(200).send('File upload success');
-  
+  } catch (e) {
+    res.status(500).send('File upload unsuccess');
+  }
+
 });
 
 // Catch-all route to serve the React app

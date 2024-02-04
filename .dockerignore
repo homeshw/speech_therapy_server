@@ -2,3 +2,4 @@ node_modules
 audio_files/*.mp3
 audio_files/*.wav
 config.json
+.env

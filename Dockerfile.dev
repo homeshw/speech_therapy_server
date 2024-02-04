@@ -1,0 +1,20 @@
+# Use a Node.js image with npm for development
+FROM node:20 as development
+
+# Set the working directory
+WORKDIR /app
+
+# Copy package.json and package-lock.json to the working directory
+COPY package*.json ./
+
+# Install dependencies, including development dependencies
+RUN npm install
+
+# Copy the remaining app files
+COPY . .
+
+# Expose port 3000 for development server
+EXPOSE 5001
+
+# Start the development server
+CMD ["npm", "run", "dev"]
