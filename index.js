@@ -92,7 +92,7 @@ const updateConfig = (newObj) => {
   })
 };
 
-app.get('/get/audio/:src', async (req, res, next) => {
+app.get('/api/get/audio/:src', async (req, res, next) => {
 
   file_name = req.params.src;
 
@@ -111,7 +111,7 @@ app.get('/get/audio/:src', async (req, res, next) => {
 
 })
 
-app.get('/get/testarray', async (req, res) => {
+app.get('/api/get/testarray', async (req, res) => {
 
   res.header('Content-Type', 'application/json');
   fs.readFile(confFilePath, 'utf8', (err, data) => {
@@ -132,7 +132,7 @@ app.get('/get/testarray', async (req, res) => {
 })
 
 // Handle file upload endpoint
-app.post('/upload', upload.single('file'), (req, res) => {
+app.post('/api/upload', upload.single('file'), (req, res) => {
 
   try {
 
