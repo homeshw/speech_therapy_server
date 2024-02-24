@@ -63,7 +63,7 @@ const audioSchema = new mongoose.Schema({
   audio: Buffer
 });
 
-const Audio = mongoose.model('Audio', audioSchema);
+const Audio = mongoose.model('test1', audioSchema);
 
 function removeTempFile(filePath) {
   fs.unlink(filePath, (err) => {
