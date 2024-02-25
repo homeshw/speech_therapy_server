@@ -63,7 +63,7 @@ const audioSchema = new mongoose.Schema({
   audio: Buffer
 });
 
-const Audio = mongoose.model('test1', audioSchema);
+const Audio = mongoose.model('audio_clips', audioSchema);
 
 function removeTempFile(filePath) {
   fs.unlink(filePath, (err) => {
@@ -125,6 +125,7 @@ async function saveAudioToDB(inputWavFilePath, outputFilePath, outputFileName, w
 
 }
 
+// delete later
 async function getAllDocumentsFields() {
   try {
     // Find all documents in the collection
@@ -134,6 +135,23 @@ async function getAllDocumentsFields() {
 
     // Map documents to an array of objects containing field1 and field2
     const result = documents.map(({ src, word }) => ({ src, word }));
+
+    return result;
+  } catch (error) {
+    console.error('Error retrieving documents:', error);
+    throw error;
+  }
+}
+
+async function getAllDocumentMetadata() {
+  try {
+    // Find all documents in the collection
+    const documents = await Audio.find({}, { src: 1, word: 1, _id: 1 }); 
+
+    console.log(documents);
+
+    // Map documents to an array of objects containing field1 and field2
+    const result = documents.map(({ src, word, id }) => ({ src, word,id }));
 
     return result;
   } catch (error) {
@@ -177,6 +195,29 @@ app.get('/api/get/testarray', async (req, res) => {
   res.header('Content-Type', 'application/json');
 
   getAllDocumentsFields()
+  .then((result) => {
+    if(result){
+      console.log('Result:', result);
+      res.json(result);
+    }
+    else{
+      console.log('empty result');
+      res.json([]);
+    }   
+    
+  })
+  .catch((error) => {
+    console.error('Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  });
+
+})
+
+app.get('/api/get/allwords', async (req, res) => {
+
+  res.header('Content-Type', 'application/json');
+
+  getAllDocumentMetadata()
   .then((result) => {
     if(result){
       console.log('Result:', result);
