@@ -55,6 +55,7 @@ const mongoose = require("mongoose");
 
 // Connect to MongoDB
 mongoose.connect(db_url);
+mongoose.pluralize(null);
 
 // Define schema for audio files
 const audioSchema = new mongoose.Schema({
@@ -63,7 +64,14 @@ const audioSchema = new mongoose.Schema({
   audio: Buffer
 });
 
+const testSchema = new mongoose.Schema({
+  name: String,
+  ids: [String]
+});
+
 const Audio = mongoose.model('audio_clips', audioSchema);
+
+const TestData = mongoose.model('test_metadata', testSchema);
 
 function removeTempFile(filePath) {
   fs.unlink(filePath, (err) => {
@@ -75,52 +83,30 @@ function removeTempFile(filePath) {
   });
 }
 
-async function saveAudioToDB(inputWavFilePath, outputFilePath, outputFileName, word) {
+async function saveTestDataToDB(testName, testIds) {
 
-  return new Promise((resolve,reject) => {
-    // Create a writable stream to store the converted audio data
-    const outputStream = fs.createWriteStream(outputFilePath);
+  return new Promise(async (resolve,reject) => {
 
-    // Create ffmpeg command
-    const command = ffmpeg()
-      .input(inputWavFilePath)
-      .audioCodec('libmp3lame') // specify audio codec (MP3)
-      .format('mp3'); // specify output format
+    try {
 
-    // Write the converted audio data to the output stream
-    command.pipe(outputStream);
+      // Create a new audio document
+      const testData = new TestData({
+        name: testName,
+        ids: testIds
+      });
 
-    // Handle ffmpeg events
-    command.on('start', () => {
-      console.log('ffmpeg processing started');
-    }).on('progress', (progress) => {
-      console.log(`Processing: ${progress.percent}% done`);
-    }).on('end', async () => {
+      // Save the audio document to MongoDB
+      await testData.save();
+      console.log('Test data saved to MongoDB');
+      resolve();
 
-      console.log('conversion finished');
+    } catch (error) {
 
-      // Read the converted audio file
-      const convertedAudioBuffer = fs.readFileSync(outputFilePath);
+      console.error('Error saving test data to MongoDB:', error);
+      reject();
 
-      try {
-        // Create a new audio document
-        const audio = new Audio({
-          src: outputFileName,
-          word: word,
-          audio: convertedAudioBuffer,
-        });
+    }
 
-        // Save the audio document to MongoDB
-        await audio.save();
-        console.log('Converted audio file saved to MongoDB');
-        resolve();
-      } catch (error) {
-        console.error('Error saving converted audio file to MongoDB:', error);
-      }
-    }).on('error', (err) => {
-      console.error('Error during processing:', err);
-      rejects(error);
-    });
   });
 
 }
@@ -237,7 +223,7 @@ app.get('/api/get/allwords', async (req, res) => {
 })
 
 // Handle file upload endpoint
-app.post('/api/upload', upload.single('file'), async (req, res) => {
+app.post('/api/upload/audio', upload.single('file'), async (req, res) => {
 
   try {
 
@@ -269,6 +255,26 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 
   } catch (e) {
     res.status(500).send('File upload unsuccess');
+  }
+
+});
+
+app.post('/api/upload/test', async (req, res) => {
+
+  try {
+
+    console.log('test data upload >> start');
+
+    console.log(req.body);
+
+    const data = req.body;
+
+    saveTestDataToDB(data.name, data.ids);
+
+    console.log('test data upload >> end');
+
+  } catch (e) {
+    res.status(500).send('Failed to save the test. Internal server error');
   }
 
 });
