@@ -85,7 +85,7 @@ function removeTempFile(filePath) {
 
 async function saveTestDataToDB(testName, testIds) {
 
-  return new Promise(async (resolve,reject) => {
+  return new Promise(async (resolve, reject) => {
 
     try {
 
@@ -112,10 +112,11 @@ async function saveTestDataToDB(testName, testIds) {
 }
 
 // delete later
-async function getAllDocumentsFields() {
+async function getTestData(audioIds) {
   try {
+    console.log('getTestData >> start');
     // Find all documents in the collection
-    const documents = await Audio.find({}, { src: 1, word: 1, _id: 0 }); 
+    const documents = await Audio.find({ _id: { $in: audioIds } }, { src: 1, word: 1, _id: 0 });
 
     console.log(documents);
 
@@ -132,16 +133,33 @@ async function getAllDocumentsFields() {
 async function getAllDocumentMetadata() {
   try {
     // Find all documents in the collection
-    const documents = await Audio.find({}, { src: 1, word: 1, _id: 1 }); 
+    const documents = await Audio.find({}, { src: 1, word: 1, _id: 1 });
 
     console.log(documents);
 
     // Map documents to an array of objects containing field1 and field2
-    const result = documents.map(({ src, word, id }) => ({ src, word,id }));
+    const result = documents.map(({ src, word, id }) => ({ src, word, id }));
 
     return result;
   } catch (error) {
     console.error('Error retrieving documents:', error);
+    throw error;
+  }
+}
+
+async function getTestList() {
+  try {
+    // Find all documents in the collection
+    const documents = await TestData.find({}, { name: 1, _id: 1 });
+
+    console.log(documents);
+
+    // Map documents to an array of objects containing field1 and field2
+    const result = documents.map(({ name, id }) => ({ name, id }));
+
+    return result;
+  } catch (error) {
+    console.error('Error retrieving test list:', error);
     throw error;
   }
 }
@@ -176,26 +194,46 @@ app.get('/api/get/audio/:src', async (req, res, next) => {
 
 })
 
-app.get('/api/get/testarray', async (req, res) => {
+app.get('/api/get/testarray', async (req, res, next) => {
 
   res.header('Content-Type', 'application/json');
 
-  getAllDocumentsFields()
-  .then((result) => {
-    if(result){
-      console.log('Result:', result);
-      res.json(result);
+  try {
+
+    const testId = req.query.testid;
+    console.log(testId);
+    const testObj = await TestData.findOne({ _id: testId });
+
+    if (!testObj) {
+      return res.status(404).json({ error: 'Test data not found' });
+    } else {
+      if (testObj.ids.length > 0) {
+        getTestData(testObj.ids)
+          .then((result) => {
+            if (result) {
+              console.log('Result:', result);
+              res.json(result);
+            }
+            else {
+              console.log('empty result');
+              res.json([]);
+            }
+
+          })
+          .catch((error) => {
+            console.error('Error:', error);
+            res.status(500).json({ error: 'Internal Server Error' });
+          });
+      }
+      else {
+        console.log('empty result');
+        res.json([]);
+      }
     }
-    else{
-      console.log('empty result');
-      res.json([]);
-    }   
-    
-  })
-  .catch((error) => {
-    console.error('Error:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  });
+  } catch (error) {
+    console.error('Error fetching test data:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 
 })
 
@@ -204,21 +242,44 @@ app.get('/api/get/allwords', async (req, res) => {
   res.header('Content-Type', 'application/json');
 
   getAllDocumentMetadata()
-  .then((result) => {
-    if(result){
-      console.log('Result:', result);
-      res.json(result);
-    }
-    else{
-      console.log('empty result');
-      res.json([]);
-    }   
-    
-  })
-  .catch((error) => {
-    console.error('Error:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  });
+    .then((result) => {
+      if (result) {
+        console.log('All audio meta data:', result);
+        res.json(result);
+      }
+      else {
+        console.log('empty result');
+        res.json([]);
+      }
+
+    })
+    .catch((error) => {
+      console.error('Error:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    });
+
+})
+
+app.get('/api/get/testlist', async (req, res) => {
+
+  res.header('Content-Type', 'application/json');
+
+  getTestList()
+    .then((result) => {
+      if (result) {
+        console.log('Test List:', result);
+        res.json(result);
+      }
+      else {
+        console.log('empty result');
+        res.json([]);
+      }
+
+    })
+    .catch((error) => {
+      console.error('Error:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    });
 
 })
 
@@ -242,16 +303,16 @@ app.post('/api/upload/audio', upload.single('file'), async (req, res) => {
     outputFileName = fileNameWOext + '.mp3';
 
     saveAudioToDB(inputFilePath, outputFilePath, outputFileName, word)
-    .then(() => {
-      removeTempFile(inputFilePath);
-      removeTempFile(outputFilePath);
-      console.log('Conversion successful');
-      res.status(200).send('File upload success');
-    })
-    .catch((error) => {
-      console.error('error:',error);
-      res.status(500).send('File upload unsuccess');
-    })
+      .then(() => {
+        removeTempFile(inputFilePath);
+        removeTempFile(outputFilePath);
+        console.log('Conversion successful');
+        res.status(200).send('File upload success');
+      })
+      .catch((error) => {
+        console.error('error:', error);
+        res.status(500).send('File upload unsuccess');
+      })
 
   } catch (e) {
     res.status(500).send('File upload unsuccess');
