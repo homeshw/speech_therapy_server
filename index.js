@@ -52,6 +52,7 @@ app.use(express.static(path.join(__dirname, 'speech_therapy/build')));
 // init mongodb 
 
 const mongoose = require("mongoose");
+const { timeStamp } = require('console');
 
 // Connect to MongoDB
 mongoose.connect(db_url);
@@ -69,9 +70,17 @@ const testSchema = new mongoose.Schema({
   ids: [String]
 });
 
+const testResultSchema = new mongoose.Schema({
+  testId: String,
+  correct: Number,
+  total: Number
+}, { timestamps: true });
+
 const Audio = mongoose.model('audio_clips', audioSchema);
 
 const TestData = mongoose.model('test_metadata', testSchema);
+
+const TestResult = mongoose.model('test_results', testResultSchema);
 
 function removeTempFile(filePath) {
   fs.unlink(filePath, (err) => {
@@ -111,7 +120,35 @@ async function saveTestDataToDB(testName, testIds) {
 
 }
 
-// delete later
+async function saveTestResultToDB(testId, correct, total) {
+
+  return new Promise(async (resolve, reject) => {
+
+    try {
+
+      // Create a new audio document
+      const testResult = new TestResult({
+        testId: testId,
+        correct: correct,
+        total: total
+      });
+
+      // Save the audio document to MongoDB
+      await testResult.save();
+      console.log('Test results saved to MongoDB');
+      resolve();
+
+    } catch (error) {
+
+      console.error('Error saving test results to MongoDB:', error);
+      reject();
+
+    }
+
+  });
+
+}
+
 async function getTestData(audioIds) {
   try {
     console.log('getTestData >> start');
@@ -330,12 +367,44 @@ app.post('/api/upload/test', async (req, res) => {
 
     const data = req.body;
 
+    // check if duplicates exist
+    try {
+      const existingEntry = await TestData.findOne({ name: data.name });
+      if (existingEntry) {
+        console.log('Duplicate entry found!');
+        res.status(422).send('Test with same name exist');
+        return;
+      }
+      console.log('No duplicate entry found.');
+    } catch (error) {
+      console.error('Error checking for duplicate entry:', error);
+      throw error;
+    }
+
     saveTestDataToDB(data.name, data.ids);
 
     console.log('test data upload >> end');
 
   } catch (e) {
     res.status(500).send('Failed to save the test. Internal server error');
+  }
+
+});
+
+app.post('/api/upload/testresult', async (req, res) => {
+
+  try {
+
+    console.log('test result upload >> start');
+
+    const data = req.body;
+
+    saveTestResultToDB(data.testId, data.correct, data.result);
+
+    console.log('test results upload >> end');
+
+  } catch (e) {
+    res.status(500).send('Failed to save the test results. Internal server error');
   }
 
 });
