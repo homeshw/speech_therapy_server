@@ -120,6 +120,55 @@ async function saveTestDataToDB(testName, testIds) {
 
 }
 
+async function saveAudioToDB(inputWavFilePath, outputFilePath, outputFileName, word) {
+
+  return new Promise((resolve, reject) => {
+    // Create a writable stream to store the converted audio data
+    const outputStream = fs.createWriteStream(outputFilePath);
+
+    // Create ffmpeg command
+    const command = ffmpeg()
+      .input(inputWavFilePath)
+      .audioCodec('libmp3lame') // specify audio codec (MP3)
+      .format('mp3'); // specify output format
+
+    // Write the converted audio data to the output stream
+    command.pipe(outputStream);
+
+    // Handle ffmpeg events
+    command.on('start', () => {
+      console.log('ffmpeg processing started');
+    }).on('progress', (progress) => {
+      console.log(`Processing: ${progress.percent}% done`);
+    }).on('end', async () => {
+
+      console.log('conversion finished');
+
+      // Read the converted audio file
+      const convertedAudioBuffer = fs.readFileSync(outputFilePath);
+
+      try {
+        // Create a new audio document
+        const audio = new Audio({
+          src: outputFileName,
+          word: word,
+          audio: convertedAudioBuffer,
+        });
+
+        // Save the audio document to MongoDB
+        await audio.save();
+        console.log('Converted audio file saved to MongoDB');
+        resolve();
+      } catch (error) {
+        console.error('Error saving converted audio file to MongoDB:', error);
+      }
+    }).on('error', (err) => {
+      console.error('Error during processing:', err);
+      rejects(error);
+    });
+  })
+}
+
 async function saveTestResultToDB(testId, correct, total) {
 
   return new Promise(async (resolve, reject) => {
@@ -325,11 +374,11 @@ app.post('/api/upload/audio', upload.single('file'), async (req, res) => {
 
   try {
 
-    console.log(req)
+    // console.log(req)
     fileName = req.file.originalname
     word = req.body.word
 
-    console.log(word);
+    console.log('uploading word: ' + word);
 
     fileNameWOext = path.parse(fileName).name;
 
@@ -408,6 +457,54 @@ app.post('/api/upload/testresult', async (req, res) => {
   }
 
 });
+
+app.delete('/api/delete/audio', async (req, res, next) => {
+
+  res.header('Content-Type', 'application/json');
+
+  try {
+
+    const audioId = req.query.audioid;
+    //console.log(testId);
+    const audioObj = await Audio.findOne({ _id: audioId });
+
+    // Find and delete document with specific ID
+    await Audio.findOneAndDelete({ _id: audioId })
+      .then((result) => {
+        if (result) {
+          console.log('Audio file deleted successfully:', result);
+        } else {
+          console.log('Audio file not found');
+        }
+      })
+      .catch((error) => {
+        console.error('Error deleting audio file:', error);
+        // Close the MongoDB connection
+        throw error;
+      });
+
+    // Update all documents to remove string audioId from the ids field
+    // Pull all removes every occurance of audioId
+
+    await TestData.updateMany({}, { $pullAll: { ids: [audioId] } })
+      .then((result) => {
+        if (result) {
+          console.log('Audio IDs removed successfully from tests:', result);
+        } else {
+          console.log('Audio IDs cannot be found in tests');
+        }
+      })
+      .catch((error) => {
+        console.error('Error in removing audio IDs from tests:', error);
+      });
+
+
+  } catch (error) {
+    console.error('Error fetching test data:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+
+})
 
 // Catch-all route to serve the React app
 app.get('*', (req, res) => {
