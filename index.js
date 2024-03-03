@@ -58,6 +58,8 @@ const { timeStamp } = require('console');
 mongoose.connect(db_url);
 mongoose.pluralize(null);
 
+const Schema = mongoose.Schema;
+
 // Define schema for audio files
 const audioSchema = new mongoose.Schema({
   src: String,
@@ -67,11 +69,11 @@ const audioSchema = new mongoose.Schema({
 
 const testSchema = new mongoose.Schema({
   name: String,
-  ids: [String]
+  ids: [Schema.Types.ObjectId]
 });
 
 const testResultSchema = new mongoose.Schema({
-  testId: String,
+  testId: Schema.Types.ObjectId,
   correct: Number,
   total: Number
 }, { timestamps: true });
@@ -249,6 +251,51 @@ async function getTestList() {
     throw error;
   }
 }
+
+async function getResultsGrid() {
+
+  try {
+    const gridData = await TestResult.aggregate([
+      {
+        $group: {
+          _id: '$testId',
+          totalAttempts: { $sum: 1 },
+          totalQuestions: { $sum: '$total' },
+          totalCorrect: { $sum: '$correct' }
+        }
+      },
+      {
+        $lookup: {
+          from: 'test_metadata', // Name of the collection to join
+          localField: '_id', // Field from the input document
+          foreignField: '_id', // Field from the 'test_metadat' collection
+          as: 'test_lookup' // Output array field
+        }
+      },
+      {
+        $unwind: '$test_lookup'
+      },
+      {
+        $project: {
+          id: '$_id',
+          attemptCount: { $sum: '$totalAttempts' },
+          successRate: { $divide: ['$totalCorrect', '$totalQuestions'] },
+          testName: '$test_lookup.name'
+        }
+      },
+
+    ]);
+
+    return gridData;
+  }
+
+  catch (error) {
+    console.error('Error retrieving result grid:', error);
+    throw error;
+
+  }
+}
+
 
 app.get('/api/get/audio/:src', async (req, res, next) => {
 
@@ -448,7 +495,7 @@ app.post('/api/upload/testresult', async (req, res) => {
 
     const data = req.body;
 
-    saveTestResultToDB(data.testId, data.correct, data.result);
+    saveTestResultToDB(data.testId, data.correct, data.total);
 
     console.log('test results upload >> end');
 
@@ -503,6 +550,29 @@ app.delete('/api/delete/audio', async (req, res, next) => {
     console.error('Error fetching test data:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+
+})
+
+app.get('/api/get/results/grid', async (req, res) => {
+
+  res.header('Content-Type', 'application/json');
+
+  getResultsGrid()
+    .then((result) => {
+      if (result) {
+        console.log('Results grid:', result);
+        res.json(result);
+      }
+      else {
+        console.log('empty result');
+        res.json([]);
+      }
+
+    })
+    .catch((error) => {
+      console.error('Error:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    });
 
 })
 
