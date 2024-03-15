@@ -75,7 +75,8 @@ const testSchema = new mongoose.Schema({
 const testResultSchema = new mongoose.Schema({
   testId: Schema.Types.ObjectId,
   correct: Number,
-  total: Number
+  total: Number,
+  statistics :[{testId: String, word: String, answerTime : Date, playTime : Date}]
 }, { timestamps: true });
 
 const Audio = mongoose.model('audio_clips', audioSchema);
@@ -171,7 +172,7 @@ async function saveAudioToDB(inputWavFilePath, outputFilePath, outputFileName, w
   })
 }
 
-async function saveTestResultToDB(testId, correct, total) {
+async function saveTestResultToDB(testId, correct, total,statistics) {
 
   return new Promise(async (resolve, reject) => {
 
@@ -181,7 +182,8 @@ async function saveTestResultToDB(testId, correct, total) {
       const testResult = new TestResult({
         testId: testId,
         correct: correct,
-        total: total
+        total: total,
+        statistics : statistics
       });
 
       // Save the audio document to MongoDB
@@ -495,9 +497,10 @@ app.post('/api/upload/testresult', async (req, res) => {
 
     const data = req.body;
 
-    saveTestResultToDB(data.testId, data.correct, data.total);
+    await saveTestResultToDB(data.testId, data.correct, data.total, data.statistics);
 
     console.log('test results upload >> end');
+    res.status(200).send('ok');
 
   } catch (e) {
     res.status(500).send('Failed to save the test results. Internal server error');
