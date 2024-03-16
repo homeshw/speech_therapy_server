@@ -76,7 +76,7 @@ const testResultSchema = new mongoose.Schema({
   testId: Schema.Types.ObjectId,
   correct: Number,
   total: Number,
-  statistics :[{testId: String, word: String, answerTime : Date, playTime : Date}]
+  statistics: [{ testId: String, word: String, answerTime: Date, playTime: Date }]
 }, { timestamps: true });
 
 const Audio = mongoose.model('audio_clips', audioSchema);
@@ -172,7 +172,7 @@ async function saveAudioToDB(inputWavFilePath, outputFilePath, outputFileName, w
   })
 }
 
-async function saveTestResultToDB(testId, correct, total,statistics) {
+async function saveTestResultToDB(testId, correct, total, statistics) {
 
   return new Promise(async (resolve, reject) => {
 
@@ -183,7 +183,7 @@ async function saveTestResultToDB(testId, correct, total,statistics) {
         testId: testId,
         correct: correct,
         total: total,
-        statistics : statistics
+        statistics: statistics
       });
 
       // Save the audio document to MongoDB
@@ -295,6 +295,18 @@ async function getResultsGrid() {
     console.error('Error retrieving result grid:', error);
     throw error;
 
+  }
+}
+
+async function getTestResultByTestId(id) {
+  try {
+    const results = await TestResult.find({testId : id});
+    return results;
+  }
+
+  catch (error) {
+    console.error('Error retrieving results for testid:'+id, error);
+    throw error;
   }
 }
 
@@ -561,6 +573,30 @@ app.get('/api/get/results/grid', async (req, res) => {
   res.header('Content-Type', 'application/json');
 
   getResultsGrid()
+    .then((result) => {
+      if (result) {
+        console.log('Results grid:', result);
+        res.json(result);
+      }
+      else {
+        console.log('empty result');
+        res.json([]);
+      }
+
+    })
+    .catch((error) => {
+      console.error('Error:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    });
+
+})
+
+app.get('/api/get/results/:id', async (req, res) => {
+
+  const id = req.params.id;
+  res.header('Content-Type', 'application/json');
+
+  getTestResultByTestId(id)
     .then((result) => {
       if (result) {
         console.log('Results grid:', result);
